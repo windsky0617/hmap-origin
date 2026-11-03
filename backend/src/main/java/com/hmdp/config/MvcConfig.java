@@ -15,16 +15,8 @@ public class MvcConfig implements WebMvcConfigurer {
     private StringRedisTemplate stringRedisTemplate;
     @Override    //添加拦截器
     public void addInterceptors(InterceptorRegistry registry) {
-        //registry : 拦截器的注册器      默认拦截一切路径                  //排除不需要拦截的路径(放行)
-        registry.addInterceptor(new LoginInterceptor(stringRedisTemplate)).excludePathPatterns(
-
-                "/shop/**",
-                "/voucher/**",
-                "/shop-type/**",
-                "/upload/**",
-                "/blog/hot",
-                "/user/code",
-                "/user/login"
-        );
+        registry.addInterceptor(new LoginInterceptor(stringRedisTemplate))
+                .addPathPatterns("/**")
+                .excludePathPatterns("/error");
     }
 }

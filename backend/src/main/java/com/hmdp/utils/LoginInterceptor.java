@@ -3,15 +3,12 @@ package com.hmdp.utils;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.entity.User;
-import io.netty.util.internal.StringUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -34,20 +31,17 @@ public class LoginInterceptor implements HandlerInterceptor {
 //        Object user = session.getAttribute("user");
         //1.获取请求头中的token                    //前端代码中的
         String token = request.getHeader("authorization");
+        boolean publicRequest = isPublicRequest(request);
 
         if (StrUtil.isBlank(token)) {
-            //4.不存在，拦截，返回401状态码
-            response.setStatus(401);
-            return false;
+            return allowPublicOrReject(publicRequest, response);
         }
         //2.基于token获取redis中的用户
         String key = RedisConstants.LOGIN_USER_KEY + token;
         Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(key);
         //3.判断用户是否存在
         if (userMap.isEmpty()) {
-            //4.不存在，拦截，返回401状态码
-            response.setStatus(401);
-            return false;
+            return allowPublicOrReject(publicRequest, response);
         }
 
         //5.将查询到的哈希数据再转为UserDTO对象
@@ -60,6 +54,30 @@ public class LoginInterceptor implements HandlerInterceptor {
         stringRedisTemplate.expire(key,RedisConstants.LOGIN_USER_TTL, TimeUnit.MINUTES);
         //8.放行
         return true;
+    }
+
+    private boolean allowPublicOrReject(boolean publicRequest, HttpServletResponse response) {
+        if (publicRequest) {
+            return true;
+        }
+        response.setStatus(401);
+        return false;
+    }
+
+    private boolean isPublicRequest(HttpServletRequest request) {
+        String method = request.getMethod();
+        String path = request.getRequestURI();
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            return true;
+        }
+        if (!"GET".equalsIgnoreCase(method)) {
+            return ("/user/code".equals(path) || "/user/login".equals(path))
+                    && "POST".equalsIgnoreCase(method);
+        }
+        return path.startsWith("/shop/")
+                || path.startsWith("/shop-type/")
+                || path.startsWith("/voucher/list/")
+                || "/blog/hot".equals(path);
     }
 
 

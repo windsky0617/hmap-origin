@@ -8,9 +8,7 @@ import cn.hutool.json.JSONUtil;
 import com.hmdp.entity.Shop;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.TimeoutUtils;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.events.Event;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
@@ -48,7 +46,7 @@ public class CacheClient {
         //类型不确定全用泛型                        key的前缀       针对什么类型的数据
     public <R,ID> R queryWithPassThrough(String keyPrefix,ID id,Class<R> type,Function<ID,R> dbFallback,Long time, TimeUnit unit){
 
-        String key = "CACHE_SHOP_KEY"+id;
+        String key = keyPrefix + id;
         //1.从redis查询商铺信息的缓存
         String json = stringRedisTemplate.opsForValue().get(key);//此处为普通json
 
@@ -78,7 +76,6 @@ public class CacheClient {
         //6.存在，写入redis
        this.set(key,r,time,unit);
         //7.返回商铺信息
-        System.out.println(r);
         return r;
     }
 

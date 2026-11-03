@@ -4,7 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
-import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
@@ -16,7 +15,6 @@ import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -89,9 +87,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //3.从redis中取得校验码并校验
         String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY+phone);
         String code = loginForm.getCode();
-        if (code == null || !cacheCode.equals(code) ) {
+        if (cacheCode == null || code == null || !cacheCode.equals(code)) {
             //3.不符合，返回错误信息
-            return Result.fail("验证码错误66");
+            return Result.fail("验证码错误或已过期");
         }
 
         //4.根据手机号查询用户
@@ -131,6 +129,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //8.返回token到前端
 
         return Result.ok(token);
+    }
+
+    @Override
+    public Result logout(String token) {
+        if (token != null && !token.trim().isEmpty()) {
+            stringRedisTemplate.delete(LOGIN_USER_KEY + token.trim());
+        }
+        return Result.ok();
     }
 
     @Override

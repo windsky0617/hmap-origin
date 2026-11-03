@@ -76,7 +76,7 @@ public class ShopController {
             @RequestParam(value = "y",required = false) Double y
     ) {
        return shopService.queryShopByType(typeId,current,x,y);
-;    }
+  }
 
     /**
      * 根据商铺名称关键字分页查询商铺信息

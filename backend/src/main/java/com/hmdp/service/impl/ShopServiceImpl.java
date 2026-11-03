@@ -1,6 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -14,9 +13,7 @@ import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisData;
 import com.hmdp.utils.SystemConstants;
-import jdk.nashorn.internal.scripts.JS;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -27,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import javax.security.auth.login.Configuration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -49,8 +45,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
-    @Autowired
-    private ResourceLoader resourceLoader;
     @Autowired
     private CacheClient cacheClient;
 
@@ -103,8 +97,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 //            return  Result.fail("店铺不存在!");
 //        }
 
-        //返回
-        System.out.println(shop.toString());
+        if (shop == null) {
+            return Result.fail("店铺不存在!");
+        }
         return Result.ok(shop);
 
     }
@@ -289,7 +284,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         redisData.setData(shop);
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(expireSeconds));
         //3.写入redis
-        stringRedisTemplate.opsForValue().set("CACHE_SHOP_KEY"+id,JSONUtil.toJsonStr(redisData));
+        stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id,JSONUtil.toJsonStr(redisData));
     }
 
 //==================================================================
@@ -305,7 +300,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         //1.先更新数据库
         updateById(shop);//mybatis-plus的方法，自动拿到已在实体类表明的主键id去根据id去数据库更新
         //2.后删除缓存
-        stringRedisTemplate.delete("CACHE_SHOP_KEY"+id);
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
         return Result.ok();
     }
 

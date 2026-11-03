@@ -12,6 +12,7 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.Collections;
@@ -35,13 +36,25 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     private IUserService userService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Result follow(Long followUserId, Boolean isFollow) {
 //**执行关注或者取消关注动作**，参数 `isFollow` 由前端传，true 关注、false 取关
 // 1. 获取登录用户
         Long userId = UserHolder.getUser().getId();
+        if (followUserId == null || followUserId.equals(userId)) {
+            return Result.fail("不能关注自己");
+        }
         String key = "follows:" + userId;
 // 1. 判断到底是关注还是取关
         if (isFollow) {
+            Integer count = query()
+                    .eq("user_id", userId)
+                    .eq("follow_user_id", followUserId)
+                    .count();
+            if (count > 0) {
+                stringRedisTemplate.opsForSet().add(key, followUserId.toString());
+                return Result.ok();
+            }
             // 2. 关注，新增数据
             Follow follow = new Follow();
             follow.setUserId(userId);
@@ -57,7 +70,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
             //把关注用户的id从redis中移除
             stringRedisTemplate.opsForSet().remove(key,followUserId.toString());
         }
-        return null;
+        return Result.ok();
     }
 
     @Override
