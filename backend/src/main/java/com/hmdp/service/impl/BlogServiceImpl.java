@@ -1,7 +1,6 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
@@ -113,8 +112,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         // 2. 判断当前登录用户是否已经点赞
         String key = BLOG_LIKED_KEY + id;
         //去redis里查询这个blog已经点赞了的set集合里有没有这个用户的id
-        Boolean isMember = stringRedisTemplate.opsForSet().isMember(key, userId.toString());
-        if(BooleanUtil.isFalse(isMember)) {
+        Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+        if (score == null) {
             // 3. 如果未点赞，可以点赞
             // 3.1. 数据库点赞数 + 1
             boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
@@ -125,7 +124,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         }else {
             // 4. 如果已点赞，取消点赞
             // 4.1. 数据库点赞数 -1
-            boolean isSuccess = update().setSql("liked = liked - 1").eq("id", id).update();
+            boolean isSuccess = update().setSql("liked = GREATEST(liked - 1, 0)").eq("id", id).update();
             // 4.2. 把用户从Redis的set集合移除
             if (isSuccess) {
                 stringRedisTemplate.opsForZSet().remove(key, userId.toString());
@@ -139,7 +138,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     public Result queryBlogLikes(Long id) {
         String key = BLOG_LIKED_KEY + id;
 // 1. 查询top5的点赞用户 zrange key 0 4
-        Set<String> top5 = stringRedisTemplate.opsForZSet().range(key, 0, 4);
+        Set<String> top5 = stringRedisTemplate.opsForZSet().reverseRange(key, 0, 4);
         if (top5==null || top5.isEmpty()){
             return Result.ok(Collections.emptyList());
         }
@@ -175,7 +174,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         //4，推送笔记id给所有粉丝
         for(Follow follow:follows ){
             //4.1获取粉丝id
-            Long userId = follow.getId();
+            Long userId = follow.getUserId();
             //4.2推送
             String key = FEED_KEY +userId;    //粉丝的收件箱      投送的笔记的id    根据时间戳排序
             stringRedisTemplate.opsForZSet().add(key,blog.getId().toString(),System.currentTimeMillis());
@@ -195,7 +194,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .reverseRangeByScoreWithScores(key, 0, max, offset, 2);//查收件箱里已经按时间先后排序的blog
 // 3. 非空判断
         if (typedTuples == null || typedTuples.isEmpty()) {
-            return Result.ok();
+            ScrollResult empty = new ScrollResult();
+            empty.setList(Collections.emptyList());
+            empty.setMinTime(0L);
+            empty.setOffset(0);
+            return Result.ok(empty);
         }
 // 4. 解析拿到的blog的数据: blogId、minTime（时间戳）、offset
         List<Long> ids = new ArrayList<>(typedTuples.size());
@@ -237,6 +240,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private void queryBlogUser(Blog blog) {
         Long userId = blog.getUserId();
         User user = userService.getById(userId);
+        if (user == null) {
+            blog.setName("未知用户");
+            return;
+        }
         blog.setName(user.getNickName());//拿名字
         blog.setIcon(user.getIcon());//拿头像
     }

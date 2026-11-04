@@ -9,31 +9,29 @@ import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
-import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.stream.*;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
-import java.awt.dnd.DragGestureEvent;
-import java.sql.DriverManager;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -57,6 +55,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private RedissonClient redissonClient;
+    @Lazy
+    @Resource
+    private IVoucherOrderService self;
 
 
 
@@ -75,11 +76,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
 
     // 1. 创建一个单线程线程池
-    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+    private final ExecutorService seckillOrderExecutor = Executors.newSingleThreadExecutor();
     @PostConstruct
     private void init(){
         // 项目启动完成之后，提交任务到线程池,提交后线程池里的线程会执行任务类里面的方法
-        SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
+        seckillOrderExecutor.submit(new VoucherOrderHandler());
+    }
+
+    @PreDestroy
+    private void destroy() {
+        seckillOrderExecutor.shutdownNow();
     }
 
     //基于消息队列实现读取订单数据给兹线程执行
@@ -88,9 +94,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         String queueName = "stream.orders";
         @Override
         public void run() {
+            boolean streamReady = false;
             while (true){
                 try {
-                    //!!!!!!!!!!!!!!!!!要再redis提前创建stream.order消息队列，不然会一直循环报错
+                    if (!streamReady) {
+                        initStream();
+                        streamReady = true;
+                    }
                     // 1.获取消息队列中的订单信息 XREADGROUP GROUP g1 c1 COUNT 1 BLOCK 2000 STREAMS stream.orders >
                     List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
                             Consumer.from("g1", "c1"),//GROUP g1 c1
@@ -113,11 +123,46 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     // 4.ACK确认  SACK stream.order g1 id                                  //队列名      消费者组名   消息id
                     stringRedisTemplate.opsForStream().acknowledge(queueName,"g1",record.getId());
                 } catch (Exception e) {
+                    streamReady = false;
                     log.error("处理订单异常", e);
                     handlePendingList();
                 }
             }
         }
+
+        private void initStream() {
+            Boolean exists = stringRedisTemplate.hasKey(queueName);
+            if (Boolean.FALSE.equals(exists)) {
+                createGroup();
+                log.info("stream.orders and consumer group g1 created");
+                return;
+            }
+            StreamInfo.XInfoGroups groups = stringRedisTemplate.opsForStream().groups(queueName);
+            if (groups.isEmpty()) {
+                createGroup();
+                log.info("consumer group g1 created");
+            }
+        }
+
+        private void createGroup() {
+            try {
+                stringRedisTemplate.execute((RedisCallback<Object>) connection ->
+                        connection.execute(
+                                "XGROUP",
+                                "CREATE".getBytes(StandardCharsets.UTF_8),
+                                queueName.getBytes(StandardCharsets.UTF_8),
+                                "g1".getBytes(StandardCharsets.UTF_8),
+                                "$".getBytes(StandardCharsets.UTF_8),
+                                "MKSTREAM".getBytes(StandardCharsets.UTF_8)
+                        ));
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("BUSYGROUP")) {
+                    return;
+                }
+                throw e;
+            }
+        }
+
         private void handlePendingList() {
             while (true){
                 try {
@@ -156,9 +201,23 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     }
 
-    private IVoucherOrderService proxy;
     @Override
     public Result seckillVoucher(Long voucherId) {
+
+        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+        if (voucher == null) {
+            return Result.fail("优惠券不存在");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (voucher.getBeginTime().isAfter(now)) {
+            return Result.fail("秒杀尚未开始");
+        }
+        if (voucher.getEndTime().isBefore(now)) {
+            return Result.fail("秒杀已经结束");
+        }
+        if (voucher.getStock() == null || voucher.getStock() < 1) {
+            return Result.fail("库存不足");
+        }
 
         //获取用户
         Long userId = UserHolder.getUser().getId();
@@ -177,6 +236,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         );
 
 
+        if (result == null) {
+            return Result.fail("秒杀服务繁忙，请稍后重试");
+        }
         //2.判断结果是否为0
         //2.1不为0，代表没有购买资格
         int r = result.intValue();//long类型不能和int类型比较
@@ -185,11 +247,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
 
 
-        //3.//获取代理对象，实现事务
-        //解决方法：现在声明一个类成员变量proxy，在这里（主线程获取）初始化，把代理对象放到当前类里面
-        proxy = (IVoucherOrderService) AopContext.currentProxy();//拿到当前实现类的代理对象
-
-        //4.返回订单id
+        //3.返回订单id
         return Result.ok(orderId);
     }
 
@@ -225,16 +283,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         boolean isLock = lock.tryLock();//redisson的知识
         //3.判断是否获取成功
         if (!isLock){
-            //获取失败
-            log.error("不允许重复下单");
-            return ;
+            throw new IllegalStateException("获取订单锁失败，消息将稍后重试");
         }
 
 
         try {
-            //此处是线程池里的线程（子线程）去获取，是拿不到ThreadLocal里的代理对象
-            //IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
-            proxy.createVoucherOrder(voucherOrder);
+            self.createVoucherOrder(voucherOrder);
         } finally {
             //释放锁
             lock.unlock();
@@ -343,7 +397,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     }*/
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void createVoucherOrder(VoucherOrder voucherOrder) {
         //5.一人一单,并发安全问题：最开始是0，很多线程同时来，查到count都是0，都往下走去创建订单)
         Long userId = voucherOrder.getUserId();
