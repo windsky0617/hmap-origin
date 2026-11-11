@@ -10,7 +10,7 @@ import com.hmdp.utils.SystemConstants;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 /**
  * <p>
