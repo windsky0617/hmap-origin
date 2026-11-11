@@ -10,9 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import sun.security.krb5.SCDynamicStoreConfig;
 
-import javax.annotation.Resource;
+
+import jakarta.annotation.Resource;
 
 import java.util.ArrayList;
 import java.util.List;

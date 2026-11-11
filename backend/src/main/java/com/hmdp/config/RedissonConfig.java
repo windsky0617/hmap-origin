@@ -3,32 +3,41 @@ package com.hmdp.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
-
 @Configuration
 public class RedissonConfig {
 
-    @Value("${spring.redis.host:127.0.0.1}")
+    //让 StringRedisTemplate 与 Redisson 读取同一套连接配置，包括数据库编号
+
+    @Value("${spring.data.redis.host:127.0.0.1}")
     private String redisHost;
 
-    @Value("${spring.redis.port:6379}")
+    @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
-    @Value("${spring.redis.password:}")
+    @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
-    @Bean
-    public RedissonClient redissonClient(){
+    @Value("${spring.data.redis.database:0}")
+    private int redisDatabase;
+
+    @Bean(destroyMethod = "shutdown")
+    public RedissonClient redissonClient() {
         Config config = new Config();
-        config.useSingleServer()
-                .setAddress("redis://" + redisHost + ":" + redisPort);
+
+        SingleServerConfig serverConfig = config.useSingleServer()
+                .setAddress("redis://" + redisHost + ":" + redisPort)
+                .setDatabase(redisDatabase);
+
         if (StringUtils.hasText(redisPassword)) {
-            config.useSingleServer().setPassword(redisPassword);
+            serverConfig.setPassword(redisPassword);
         }
+
         return Redisson.create(config);
     }
 }
