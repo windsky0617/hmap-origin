@@ -14,7 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -47,7 +47,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         String key = "follows:" + userId;
 // 1. 判断到底是关注还是取关
         if (isFollow) {
-            Integer count = query()
+            Long count = query()
                     .eq("user_id", userId)
                     .eq("follow_user_id", followUserId)
                     .count();
@@ -80,7 +80,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         Long userId = UserHolder.getUser().getId();
 
 // 2. 查询是否关注 select count(*) from tb_follow where user_id = ? and follow_user_id = ?
-        Integer count = query().eq("user_id", userId).eq("follow_user_id", followUserId).count();
+        Long count = query().eq("user_id", userId).eq("follow_user_id", followUserId).count();
 
 // 3. 判断
         return Result.ok(count > 0);
