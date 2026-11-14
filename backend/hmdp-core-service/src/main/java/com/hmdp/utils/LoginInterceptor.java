@@ -1,5 +1,57 @@
 package com.hmdp.utils;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+
+//这个类现在只负责访问判断，不再访问 Redis，也不再负责清理身份。
+
+//公开接口继续同时判断 HTTP 方法和路径。例如，店铺查询允许游客访问，店铺新增、修改仍需要登录。
+public class LoginInterceptor implements HandlerInterceptor {
+    //这三个是 SpringMVC 拦截器 `HandlerInterceptor` 的回调方法
+    //执行顺序：preHandle`→ Controller 业务代码 → postHandle → 视图 / 响应写完 → afterCompletion
+    @Override
+    public boolean preHandle(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Object handler) {
+        if (isPublicRequest(request) || UserHolder.getUser() != null) { //公开请求 或 用户已登录
+            return true;
+        }
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);//设置401状态码
+        return false;
+    }
+
+    private boolean isPublicRequest(HttpServletRequest request) {
+        String method = request.getMethod();// 请求方法，例如 GET、POST
+        String path = request.getRequestURI();// 请求路径，例如 /user/login
+
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            return true;
+        }//OPTIONS方法放行
+
+        if (!"GET".equalsIgnoreCase(method)) {
+            //如果不是GET方法， POST或两个路径中的一个，放行
+            return "POST".equalsIgnoreCase(method)
+                    && ("/user/code".equals(path)
+                    || "/user/login".equals(path));
+        }   //&&优先级比||高  A && B || C -->( A &&B ) ||C
+
+        //是GET方法
+        return path.startsWith("/shop/")
+                || path.startsWith("/shop-type/")
+                || path.startsWith("/voucher/list/")
+                || "/blog/hot".equals(path);
+    }
+}
+
+
+
+
+/*原：
+package com.hmdp.utils;
+
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.UserDTO;
@@ -91,3 +143,4 @@ public class LoginInterceptor implements HandlerInterceptor {
 
     }
 }
+*/
