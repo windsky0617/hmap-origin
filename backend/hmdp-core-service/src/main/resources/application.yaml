@@ -12,7 +12,7 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:hmdp}?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:hmdp}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD}
 
@@ -30,10 +30,10 @@ spring:
           time-between-eviction-runs: 10s
 
   jackson:
-    default-property-inclusion: non_null  #JSON处理时忽略空字符串
+    default-property-inclusion: non_null
 
 mybatis-plus:
-  type-aliases-package: com.hmdp.entity  #别名扫描包
+  type-aliases-package: com.hmdp.entity
 
 logging:
   level:
