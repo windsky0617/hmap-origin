@@ -7,6 +7,7 @@ import com.hmdp.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.Positive;
 
 /**
  * <p>
@@ -51,7 +52,9 @@ public class VoucherController {
      * @return 优惠券列表
      */
     @GetMapping("/list/{shopId}")
-    public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId) {
-       return voucherService.queryVoucherOfShop(shopId);
+    public Result queryVoucherOfShop(
+            @Positive(message = "店铺ID必须大于0")
+            @PathVariable("shopId") Long shopId) {
+        return voucherService.queryVoucherOfShop(shopId);
     }
 }

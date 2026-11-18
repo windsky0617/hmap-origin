@@ -13,16 +13,10 @@ import com.hmdp.utils.UserHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 
-/**
- * <p>
- * 前端控制器
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @RestController
 @RequestMapping("/blog")
 public class BlogController {
@@ -42,7 +36,12 @@ public class BlogController {
     }
 
     @GetMapping("/of/me")
-    public Result queryMyBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+    public Result queryMyBlog(
+            //@Min(1)    → 值 >= 1
+            //@Max(100)  → 值 <= 100
+            //`message = "页码不能小于1"`：**校验不通过时，返回给前端的错误提示文本**
+            @Min(value = 1, message = "页码不能小于1")
+            @RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 获取登录用户
         UserDTO user = UserHolder.getUser();
         // 根据用户查询
@@ -54,7 +53,9 @@ public class BlogController {
     }
 
     @GetMapping("/hot")
-    public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+    public Result queryHotBlog(
+            @Min(value = 1, message = "页码不能小于1")
+            @RequestParam(value = "current", defaultValue = "1") Integer current) {
         return blogService.queryHotBlog(current);
     }
 
@@ -74,6 +75,7 @@ public class BlogController {
     //根据用户 id 查询笔记
     @GetMapping("/of/user")
     public Result queryBlogByUserId(
+            @Min(value = 1, message = "页码不能小于1")
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam("id") Long id) {
         // 根据用户查询
@@ -86,7 +88,11 @@ public class BlogController {
 
 
     @GetMapping("/of/follow")
-    public Result queryBloglOfFollow(@RequestParam("lastId") Long max,@RequestParam("offset") Integer offset) {
+    public Result queryBloglOfFollow(
+            @Min(value = 0, message = "时间游标不能小于0")
+            @RequestParam("lastId") Long max,
+            @Min(value = 0, message = "偏移量不能小于0")
+            @RequestParam("offset") Integer offset) {
         return blogService.queryBlogOfFollow(max,offset);
     }
 

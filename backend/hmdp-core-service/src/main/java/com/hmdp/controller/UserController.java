@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.Positive;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
@@ -70,7 +71,9 @@ public class UserController {
     }
 
     @GetMapping("/info/{id}")
-    public Result info(@PathVariable("id") Long userId){
+    public Result info(
+            @Positive(message = "用户ID必须大于0")
+            @PathVariable("id") Long userId){
         // 查询详情
         UserInfo info = userInfoService.getById(userId);
         if (info == null) {
@@ -85,7 +88,9 @@ public class UserController {
 
 
     @GetMapping("/{id}")
-    public Result queryUserById(@PathVariable("id") Long userId){
+    public Result queryUserById(
+            @Positive(message = "用户ID必须大于0")
+            @PathVariable("id") Long userId){
         // 查询详情
         User user = userService.getById(userId);
         if (user == null) {
@@ -106,6 +111,7 @@ public class UserController {
     public Result signcount(){
         return userService.signCount();
     }
+
 
 
 
