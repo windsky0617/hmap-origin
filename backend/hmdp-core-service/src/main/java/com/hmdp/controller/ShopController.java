@@ -11,15 +11,11 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
-/**
- * <p>
- * 前端控制器
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @RestController
 @RequestMapping("/shop")
 public class ShopController {
@@ -33,7 +29,9 @@ public class ShopController {
      * @return 商铺详情数据
      */
     @GetMapping("/{id}")
-    public Result queryShopById(@PathVariable("id") Long id) {
+    public Result queryShopById(
+            @Positive(message = "店铺ID必须大于0")
+            @PathVariable("id") Long id) {
         return shopService.queryById(id);
     }
 
@@ -70,13 +68,19 @@ public class ShopController {
      */
     @GetMapping("/of/type")
     public Result queryShopByType(
+            @Positive(message = "店铺类型ID必须大于0")
             @RequestParam("typeId") Integer typeId,
+            @Min(value = 1, message = "页码不能小于1")
+            @Max(
+                    value = Integer.MAX_VALUE / SystemConstants.DEFAULT_PAGE_SIZE,
+                    message = "页码超出当前分页计算范围"
+            )
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "x",required = false) Double x,  //required = false代表前端这个参数可传可不传
             @RequestParam(value = "y",required = false) Double y
     ) {
-       return shopService.queryShopByType(typeId,current,x,y);
-  }
+        return shopService.queryShopByType(typeId,current,x,y);
+    }
 
     /**
      * 根据商铺名称关键字分页查询商铺信息
@@ -87,6 +91,7 @@ public class ShopController {
     @GetMapping("/of/name")
     public Result queryShopByName(
             @RequestParam(value = "name", required = false) String name,
+            @Min(value = 1, message = "页码不能小于1")
             @RequestParam(value = "current", defaultValue = "1") Integer current
     ) {
         // 根据类型分页查询
