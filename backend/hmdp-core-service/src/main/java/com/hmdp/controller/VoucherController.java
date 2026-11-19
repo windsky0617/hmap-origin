@@ -2,11 +2,13 @@ package com.hmdp.controller;
 
 
 import com.hmdp.dto.Result;
-import com.hmdp.entity.Voucher;
+import com.hmdp.dto.SeckillVoucherDto;
+import com.hmdp.dto.VoucherDto;
 import com.hmdp.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 
 /**
@@ -26,24 +28,25 @@ public class VoucherController {
 
     /**
      * 新增普通券
-     * @param voucher 优惠券信息
+     * @param voucherDto 优惠券信息
      * @return 优惠券id
      */
     @PostMapping
-    public Result addVoucher(@RequestBody Voucher voucher) {
-        voucherService.save(voucher);
-        return Result.ok(voucher.getId());
+    public Result addVoucher(@Valid @RequestBody VoucherDto voucherDto) {
+        final Long voucherId = voucherService.addVoucher(voucherDto);
+        return Result.ok(voucherId);
     }
 
     /**
      * 新增秒杀券
-     * @param voucher 优惠券信息，包含秒杀信息
+     * @param seckillVoucherDto 优惠券信息，包含秒杀信息
      * @return 优惠券id
      */
     @PostMapping("seckill")
-    public Result addSeckillVoucher(@RequestBody Voucher voucher) {
-        voucherService.addSeckillVoucher(voucher);
-        return Result.ok(voucher.getId());
+    public Result addSeckillVoucher(
+            @Valid @RequestBody SeckillVoucherDto seckillVoucherDto) {
+        final Long voucherId = voucherService.addSeckillVoucher(seckillVoucherDto);
+        return Result.ok(voucherId);
     }
 
     /**
