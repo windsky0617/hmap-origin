@@ -2,6 +2,7 @@ package com.hmdp.controller;
 
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.dto.BlogSaveDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
@@ -10,6 +11,7 @@ import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.Resource;
@@ -26,8 +28,13 @@ public class BlogController {
 
 
     @PostMapping
-    public Result saveBlog(@RequestBody Blog blog) {
-        return  blogService.saveBlog(blog);
+    public Result saveBlog(@Valid @RequestBody BlogSaveDTO form) {
+        Blog blog = new Blog();
+        blog.setShopId(form.getShopId());
+        blog.setTitle(form.getTitle());
+        blog.setImages(form.getImages());
+        blog.setContent(form.getContent());
+        return blogService.saveBlog(blog);
     }
 
     @PutMapping("/like/{id}")

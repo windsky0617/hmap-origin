@@ -91,13 +91,15 @@ axios.interceptors.response.use(function (response) {
 });
 
 axios.defaults.paramsSerializer = function(params) {
-  let p = "";
+  const query = [];
   Object.keys(params).forEach(k => {
-    if(params[k]){
-      p = p + "&" + k + "=" + params[k]
+    const value = params[k];
+    // 0 和 false 是有效参数，只跳过未提供的值和空字符串。
+    if (value !== null && value !== undefined && value !== "") {
+      query.push(encodeURIComponent(k) + "=" + encodeURIComponent(value));
     }
-  })
-  return p;
+  });
+  return query.join("&");
 }
 const util = {
   commonURL,
@@ -110,52 +112,17 @@ const util = {
     return "";
   },
   formatPrice(val) {
-    if (typeof val === 'string') {
-      if (isNaN(val)) {
-        return null;
-      }
-      // 价格转为整数
-      const index = val.lastIndexOf(".");
-      let p = "";
-      if (index < 0) {
-        // 无小数
-        p = val + "00";
-      } else if (index === p.length - 2) {
-        // 1位小数
-        p = val.replace("\.", "") + "0";
-      } else {
-        // 2位小数
-        p = val.replace("\.", "")
-      }
-      return parseInt(p);
-    } else if (typeof val === 'number') {
-      if (!val) {
-        return null;
-      }
-      const s = val + '';
-      if (s.length === 0) {
-        return "0.00";
-      }
-      if (s.length === 1) {
-        return "0.0" + val;
-      }
-      if (s.length === 2) {
-        return "0." + val;
-      }
-      const i = s.indexOf(".");
-      if (i < 0) {
-        return s.substring(0, s.length - 2) + "." + s.substring(s.length - 2)
-      }
-      const num = s.substring(0, i) + s.substring(i + 1);
-      if (i === 1) {
-        return "0.0" + num;
-      }
-      if (i === 2) {
-        return "0." + num;
-      }
-      if (i > 2) {
-        return num.substring(0, i - 2) + "." + num.substring(i - 2)
-      }
+    if (val === null || val === undefined || val === "") {
+      return null;
     }
+    const cents = String(val);
+    if (!/^-?\d+$/.test(cents)) {
+      return null;
+    }
+    const negative = cents.startsWith("-");
+    const digits = (negative ? cents.substring(1) : cents).padStart(3, "0");
+    const amount = digits.substring(0, digits.length - 2)
+        + "." + digits.substring(digits.length - 2);
+    return negative ? "-" + amount : amount;
   }
 }
