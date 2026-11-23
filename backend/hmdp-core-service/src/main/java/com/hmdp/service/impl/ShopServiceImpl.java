@@ -10,7 +10,9 @@ import com.hmdp.service.IShopService;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.SystemConstants;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -19,6 +21,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,6 +42,7 @@ import static com.hmdp.utils.RedisConstants.SHOP_GEO_KEY;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Slf4j
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
@@ -77,7 +82,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         updateById(shop);
-        stringRedisTemplate.delete(List.of(CACHE_SHOP_KEY + id, CACHE_SHOP_LOGICAL_KEY + id));
+        // 等数据库提交成功后，再让两个缓存副本失效。
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    stringRedisTemplate.delete(List.of(CACHE_SHOP_KEY + id, CACHE_SHOP_LOGICAL_KEY + id));
+                } catch (DataAccessException e) {
+                    log.error("店铺更新已提交，删除缓存失败，店铺ID={}", id, e);
+                }
+            }
+        });
         return Result.ok();
     }
 
