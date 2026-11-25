@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_LOGICAL_KEY;
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.hmdp.utils.RedisConstants.SHOP_GEO_KEY;
 
 /**
@@ -53,8 +52,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Override
     public Result queryById(Long id) {
-        Shop shop = cacheClient.queryWithPassThrough(
-                CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        Shop shop = cacheClient.queryShopById(id, this::getById);
         if (shop == null) {
             return Result.fail("店铺不存在!");
         }
@@ -67,8 +65,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return;
         }
 
-        // 保留课程示例中模拟回源延迟的设置。
-        Thread.sleep(200);
         cacheClient.setWithLogicalExpire(
                 CACHE_SHOP_LOGICAL_KEY + id, shop, expireSeconds, TimeUnit.SECONDS);
     }
