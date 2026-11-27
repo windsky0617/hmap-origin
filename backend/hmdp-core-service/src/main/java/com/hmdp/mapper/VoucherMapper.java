@@ -3,6 +3,7 @@ package com.hmdp.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.hmdp.entity.Voucher;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -17,4 +18,8 @@ import java.util.List;
 public interface VoucherMapper extends BaseMapper<Voucher> {
 
     List<Voucher> queryVoucherOfShop(@Param("shopId") Long shopId);
+
+    //启动时使用的查询，只读取已有券记录的店铺 ID。
+    @Select("SELECT DISTINCT shop_id FROM tb_voucher")
+    List<Long> listVoucherShopIds();
 }
