@@ -17,6 +17,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.hmdp</groupId>
             <artifactId>hmdp-common</artifactId>
         </dependency>
